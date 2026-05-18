@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Community-Owned Solar Database</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f4f9f4;
+      --border: #d9ecd9;
+      --border-light: #c4ddc4;
+      --accent: #e87722;
+      --accent2: #2e8b57;
+      --text: #1a2e1a;
+      --text-muted: #4a7a4a;
+      --text-dim: #8ab08a;
+      --row-hover: #eef6ee;
+      --row-alt: #f9fcf9;
+      --header-bg: #eaf4ea;
+      --badge-coop: #d4edda;
+      --badge-coop-text: #1a6b35;
+      --badge-pub: #d0e8ff;
+      --badge-pub-text: #0050a0;
+      --badge-rur: #ead5f5;
+      --badge-rur-text: #6030a0;
+      --badge-con: #fde8cc;
+      --badge-con-text: #a04a00;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 28px 32px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .header-title h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+    .header-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .header-stats {
+      display: flex;
+      gap: 20px;
+      margin-left: auto;
+    }
+    .stat {
+      text-align: right;
+    }
+    .stat-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+    }
+
+    /* ── Filters ── */
+    .filters {
+      padding: 14px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      white-space: nowrap;
+    }
+    select, input[type=text], input[type=number] {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 4px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    select:focus, input:focus { border-color: var(--accent); }
+    select { cursor: pointer; min-width: 130px; }
+    input[type=text] { width: 210px; }
+    input[type=number] { width: 70px; }
+
+    .btn-reset {
+      background: transparent;
+      border: 1px solid var(--border-light);
+      color: var(--text-muted);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-left: auto;
+    }
+    .btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+    .result-count {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    .result-count span { color: var(--accent); }
+
+    /* ── Table wrapper ── */
+    .table-wrap {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1100px;
+    }
+
+    /* ── Sticky header ── */
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    thead tr {
+      background: var(--header-bg);
+    }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      user-select: none;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    th:hover { color: var(--accent); }
+    th.sorted { color: var(--accent); }
+    th .sort-arrow { margin-left: 4px; opacity: 0.5; }
+    th.sorted .sort-arrow { opacity: 1; }
+
+    /* ── Rows ── */
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    tbody tr:nth-child(even) { background: var(--row-alt); }
+    tbody tr:hover { background: var(--row-hover); }
+
+    td {
+      padding: 9px 14px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    td.wrap { white-space: normal; max-width: 260px; }
+    td.mono {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+    }
+    td.muted { color: var(--text-muted); }
+    td.dimmed { color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .badge-cooperative    { background: var(--badge-coop); color: var(--badge-coop-text); }
+    .badge-publicly       { background: var(--badge-pub); color: var(--badge-pub-text); }
+    .badge-rural          { background: var(--badge-rur); color: var(--badge-rur-text); }
+    .badge-consumer       { background: var(--badge-con); color: var(--badge-con-text); }
+
+    /* ── MW bar ── */
+    .mw-cell { display: flex; align-items: center; gap: 8px; }
+    .mw-bar-bg {
+      width: 60px; height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .mw-bar-fill {
+      height: 100%; border-radius: 3px;
+      background: var(--accent2);
+      transition: width 0.3s;
+    }
+    .mw-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      min-width: 42px;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; }
+    .empty p { font-size: 13px; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    /* ── Page nav ── */
+    .page-nav {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      background: var(--surface);
+      padding: 0 32px;
+    }
+    .page-tab {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      padding: 11px 18px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .page-tab:hover { color: var(--accent2); }
+    .page-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Pages ── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Overview ── */
+    .ov-wrap { padding: 28px 32px; display: flex; flex-direction: column; gap: 24px; }
+    .ov-cards { display: flex; gap: 16px; flex-wrap: wrap; }
+    .ov-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 24px;
+      min-width: 160px;
+      flex: 1;
+    }
+    .ov-card-lbl {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .ov-card-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .ov-card-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .ov-section {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+    }
+    .ov-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      margin-bottom: 16px;
+    }
+    .chart-container { position: relative; height: 240px; }
+
+    /* ── Pivot table ── */
+    .pivot-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .pivot-table th {
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      background: var(--surface);
+    }
+    .pivot-table th:first-child { text-align: left; }
+    .pivot-table td {
+      padding: 8px 12px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .pivot-table td:first-child { text-align: left; }
+    .pivot-table tr:last-child td { font-weight: 600; color: var(--text); border-top: 2px solid var(--border); }
+    .pivot-table td.zero { color: var(--text-dim); }
+    .pivot-table td.hot { color: var(--accent); font-weight: 600; }
+
+    /* ── View toggle ── */
+    .view-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--border);
+      border-radius: 5px;
+      padding: 2px;
+    }
+    .view-toggle button {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      width: 28px;
+      height: 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .view-toggle button.active {
+      background: var(--bg);
+      color: var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .view-toggle button:not(.active):hover { color: var(--accent2); }
+
+    /* ── Card grid ── */
+    .card-grid {
+      display: none;
+      padding: 20px 28px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .card-grid.active { display: grid; }
+
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .card:hover {
+      border-color: var(--accent2);
+      box-shadow: 0 3px 12px rgba(46,139,87,0.10);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .card-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .card-location {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .card-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+    .card-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+    .card-lbl {
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-size: 10px;
+    }
+    .card-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .card-mw {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .card-mw-bar-bg {
+      flex: 1;
+      height: 5px;
+      background: var(--border);
+      border-radius: 3px;
+    }
+    .card-mw-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent2);
+    }
+    .card-mw-val {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      min-width: 46px;
+      text-align: right;
+    }
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-year {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    .card-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+    .card-empty .empty-icon { font-size: 36px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">
+    <h1>Community-Owned Solar Database</h1>
+    <p>Source: NREL Sharing the Sun · Exportable 1.6.25</p>
+  </div>
+  <div class="header-stats">
+    <div class="stat">
+      <div class="stat-val" id="stat-total">259</div>
+      <div class="stat-lbl">Projects</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-states">—</div>
+      <div class="stat-lbl">States</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-mw">—</div>
+      <div class="stat-lbl">Total MW-AC</div>
+    </div>
+  </div>
+</div>
+
+<nav class="page-nav">
+  <button class="page-tab active" onclick="showPage('overview')">Overview</button>
+  <button class="page-tab" onclick="showPage('database')">Database</button>
+</nav>
+
+<!-- ── Overview page ── -->
+<div id="page-overview" class="page active">
+  <div class="ov-wrap">
+    <div class="ov-cards">
+      <div class="ov-card">
+        <div class="ov-card-lbl">Total Projects</div>
+        <div class="ov-card-val" id="ov-count">—</div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-card-lbl">States</div>
+        <div class="ov-card-val" id="ov-states">—</div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-card-lbl">Total MW-AC</div>
+        <div class="ov-card-val" id="ov-mw">—</div>
+        <div class="ov-card-sub">megawatts</div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-card-lbl">Avg MW-AC</div>
+        <div class="ov-card-val" id="ov-avg">—</div>
+        <div class="ov-card-sub">per project</div>
+      </div>
+    </div>
+    <div class="ov-section">
+      <div class="ov-section-title">Projects by Ownership Structure</div>
+      <div class="chart-container"><canvas id="chart-structure"></canvas></div>
+    </div>
+    <div class="ov-section">
+      <div class="ov-section-title">Pivot — Structure × Utility Type</div>
+      <div style="overflow-x:auto"><table class="pivot-table" id="pivot-table"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Database page ── -->
+<div id="page-database" class="page">
+
+<div class="filters">
+  <div class="filter-group">
+    <span class="filter-label">Search</span>
+    <input type="text" id="search" placeholder="Project, city, utility…" />
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">State</span>
+    <select id="filter-state"><option value="">All states</option></select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Structure</span>
+    <select id="filter-structure"><option value="">All structures</option></select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Util. Type</span>
+    <select id="filter-utility-type"><option value="">All types</option></select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Year</span>
+    <input type="number" id="filter-year-min" placeholder="From" min="2000" max="2030" />
+    <span style="color:var(--text-dim)">–</span>
+    <input type="number" id="filter-year-max" placeholder="To" min="2000" max="2030" />
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">MW-AC ≥</span>
+    <input type="number" id="filter-mw-min" placeholder="0" min="0" step="0.1" style="width:70px" />
+  </div>
+  <div class="result-count" id="result-count"><span>259</span> of 259 shown</div>
+  <div class="view-toggle">
+    <button id="btn-table" class="active" onclick="setView('table')" title="Table view">&#9776;</button>
+    <button id="btn-card" onclick="setView('card')" title="Card view">&#9638;</button>
+  </div>
+  <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+</div>
+
+<div id="card-grid" class="card-grid"></div>
+
+<div class="table-wrap" id="table-wrap">
+  <table id="main-table">
+    <thead>
+      <tr>
+        <th onclick="sortBy('Project Name')"    data-col="Project Name">    Project Name    <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('City')"            data-col="City">            City            <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('State')"           data-col="State">           State           <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('Utility')"         data-col="Utility">         Utility         <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('Utility Type')"    data-col="Utility Type">    Util. Type      <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('Basic Structure')" data-col="Basic Structure"> Structure       <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('System Size (MW-AC)')" data-col="System Size (MW-AC)">MW-AC  <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('System Size (MW-DC)')" data-col="System Size (MW-DC)">MW-DC  <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('Year of Interconnection')" data-col="Year of Interconnection">Year <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('UtilityID')"       data-col="UtilityID">       Utility ID      <span class="sort-arrow">↕</span></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+</div><!-- /page-database -->
+
+<script>
+const RAW = [{"UtilityID":"3660","Project Name":"Clark Community Solar Project 5","City":"Vancouver","State":"WA","Address":"8600 NE 117th Ave, Vancouver, WA 98662","Utility":"PUD No 1 of Clark County - (WA)","Utility Type":"Political Subdivision","Basic Structure":"Consumer-owned utility","System Size (MW-AC)":"0.0316","System Size (MW-DC)":"0.003025","Year of Interconnection":"2015"},{"UtilityID":"1579","Project Name":"Old Inland Empire Community Solar Project","City":"Prosser","State":"WA","Address":"84009 W Old Inland Empire Hwy, Prosser, WA 99350","Utility":"PUD No 1 of Benton County","Utility Type":"Political Subdivision","Basic Structure":"Consumer-owned utility","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2016"},{"UtilityID":"221","Project Name":"Shungnak-Kobuk Community Solar Independent Power Producer","City":"Shungnak","State":"AK","Address":"VVQ7+M5, Shungnak, AK 99773","Utility":"Alaska Village Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Cooperative","System Size (MW-AC)":"0.06","System Size (MW-DC)":"0.08","Year of Interconnection":"2011"},{"UtilityID":"1529","Project Name":"Community Solar for Community Action","City":"Backus","State":"MN","Address":"4111 Technology Dr NW, Bemidji, MN 56601","Utility":"Beltrami Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Cooperative","System Size (MW-AC)":"0.17","System Size (MW-DC)":"0.22","Year of Interconnection":"2021"},{"UtilityID":"17470","Project Name":"Frances Anderson Center Solar Project","City":"Edmonds","State":"WA","Address":"700 Main Street Edmonds, WA 98020","Utility":"PUD 1 of Snohomish County","Utility Type":"Political Subdivision","Basic Structure":"Cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.16","Year of Interconnection":"2017"},{"UtilityID":"9267","Project Name":"Wareham Community Solar Array","City":"Wareham","State":"MA","Address":"1 Express Dr Wareham, MA 02571","Utility":"NSTAR (DBA EverSource)","Utility Type":"Cooperative","Basic Structure":"Cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2016"},{"UtilityID":"13781","Project Name":"Allium Community Solar Garden, LLC","City":"Paynesville","State":"MN","Address":"19141 293rd Ave, Paynesville, MN 56362","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2015"},{"UtilityID":"13781","Project Name":"Aquarius Community Solar Gardens, LLC","City":"Tracy","State":"MN","Address":"550 S 4th St, Tracy, MN 56175","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.20","Year of Interconnection":"2017"},{"UtilityID":"13781","Project Name":"Aquila Community Solar Gardens, LLC","City":"Glenwood","State":"MN","Address":"19592 MN-28, Glenwood, MN 56334","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"4.00","System Size (MW-DC)":"5.20","Year of Interconnection":"2013"},{"UtilityID":"13781","Project Name":"Arcturus Community Solar Gardens, LLC","City":"Kasota","State":"MN","Address":"45823 MN-22, Kasota, MN 56050","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.13","System Size (MW-DC)":"0.16","Year of Interconnection":"2015"},{"UtilityID":"13781","Project Name":"Aster Community Solar Garden, LLC","City":"Raymond","State":"MN","Address":"598 135th St SW Raymond, MN","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.13","System Size (MW-DC)":"0.16","Year of Interconnection":"2015"},{"UtilityID":"13781","Project Name":"Auriga Community Solar Garden, LLC","City":"Slayton","State":"MN","Address":"1491 91st St, Slayton, MN 56172","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.16","Year of Interconnection":"2018"},{"UtilityID":"13781","Project Name":"Cannon Garden LLC","City":"Faribault","State":"MN","Address":"23749 Albers Avenue, Faribault, MN 55021","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2015"},{"UtilityID":"13781","Project Name":"Canopus Community Solar Garden, LLC","City":"Belgrade","State":"MN","Address":"21472 343rd Ave, Belgrade, MN 56312","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"1.06","System Size (MW-DC)":"1.37","Year of Interconnection":""},{"UtilityID":"13781","Project Name":"Capricornus Community Solar Garden, LLC","City":"Paynesville","State":"MN","Address":"18978 293rd Avenue, Paynesville, MN 56362","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.54","System Size (MW-DC)":"0.70","Year of Interconnection":"2017"},{"UtilityID":"13781","Project Name":"Cassiopeia Community Solar Gardens, LLC","City":"Glenwood","State":"MN","Address":"19019 State Highway 28, Glenwood, MN 56334","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.54","System Size (MW-DC)":"0.70","Year of Interconnection":"2017"},{"UtilityID":"13781","Project Name":"Deneb Community Solar Garden, LLC","City":"Belgrade","State":"MN","Address":"15515 Hwy 55, Belgrade, MN 56312","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.54","System Size (MW-DC)":"0.70","Year of Interconnection":"2017"},{"UtilityID":"13781","Project Name":"Kaus Community Solar Garden, LLC","City":"Claremont","State":"MN","Address":"14131 County Hwy 34, Claremont, MN 55924","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.54","System Size (MW-DC)":"0.70","Year of Interconnection":"2017"},{"UtilityID":"3519","Project Name":"Lemond Solar","City":"Owatonna","State":"MN","Address":"4206 SW 8th St, Owatonna, MN 55060","Utility":"Central Municipal Power Agency/Services","Utility Type":"Political Subdivision","Basic Structure":"Cooperative","System Size (MW-AC)":"0.54","System Size (MW-DC)":"0.70","Year of Interconnection":"2017"},{"UtilityID":"13781","Project Name":"Libra Community Solar Garden, LLC","City":"Glenwood","State":"MN","Address":"171 22nd Ave NW, Glenwood, MN 56334","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2015"},{"UtilityID":"13781","Project Name":"Marigold Community Solar Garden, LLC","City":"Waterville","State":"MN","Address":"MN-60 & County Rd 170, Waterville, MN 56096","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.07","System Size (MW-DC)":"0.09","Year of Interconnection":"2017"},{"UtilityID":"13781","Project Name":"Roberds Garden","City":"Faribault","State":"MN","Address":"3073 197th St E, Faribault, MN 55021","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.06","Year of Interconnection":"2016"},{"UtilityID":"13781","Project Name":"Sagittarius Community Solar Gardens, LLC","City":"Watkins","State":"MN","Address":"10034 50th St SE, Clara City, MN 56222","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.13","Year of Interconnection":"2014"},{"UtilityID":"13781","Project Name":"Second Chance Community Solar Garden","City":"Minneapolis","State":"MN","Address":"1179 15th Ave SE, Minneapolis, MN 55414","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.39","System Size (MW-DC)":"0.50","Year of Interconnection":"2018"},{"UtilityID":"13781","Project Name":"Silver Lake Garden LLC","City":"Waseca","State":"MN","Address":"31148 State Highway 13, Waseca, MN 56093","Utility":"Northern States Power Co - Minnesota","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.05","Year of Interconnection":"2017"},{"UtilityID":"7601","Project Name":"Londonderry Garden","City":"Londonderry","State":"VT","Address":"6930 Vermont Rte 100, Londonderry, VT 05148","Utility":"Green Mountain Power Corp","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.07","Year of Interconnection":"2017"},{"UtilityID":"54913","Project Name":"Brewster Community Solar Garden LLC","City":"Brewster","State":"MA","Address":"326 Yankee DriveBrewster, Massachusetts 02631","Utility":"NSTAR (DBA EverSource)","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.20","Year of Interconnection":"2017"},{"UtilityID":"11804","Project Name":"Harvard Solar Garden Project I","City":"Harvard","State":"MA","Address":"296 Ayer Rd, Harvard, MA 01451","Utility":"National Grid","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.13","Year of Interconnection":"2017"},{"UtilityID":"11804","Project Name":"Harvard Solar Garden Project II - Primary","City":"Harvard","State":"MA","Address":"295 Ayer Rd, Harvard, MA 01451","Utility":"National Grid","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"12.98","System Size (MW-DC)":"16.88","Year of Interconnection":"2018"},{"UtilityID":"15270MD","Project Name":"Greenbelt Community Solar","City":"Greenbelt","State":"MD","Address":"101 Greenhill Rd, Greenbelt, MD 20770","Utility":"Potomac Electric Power Co","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"12.98","System Size (MW-DC)":"16.88","Year of Interconnection":"2018"},{"UtilityID":"15270MD","Project Name":"University Park Community Solar LLC","City":"University Park","State":"MD","Address":"4413 Tuckerman St, University Park, MD 20782","Utility":"Potomac Electric Power Co","Utility Type":"Investor Owned","Basic Structure":"Cooperative","System Size (MW-AC)":"2.00","System Size (MW-DC)":"2.60","Year of Interconnection":"2018"},{"UtilityID":"5862","Project Name":"Ute Mountain Ute's Community Solar","City":"Towaoc","State":"CO","Address":"801 N Broadway, Cortez, CO 81321","Utility":"Empire Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"1.50","System Size (MW-DC)":"1.95","Year of Interconnection":"2017"},{"UtilityID":"12894","Project Name":"2017 Clay County's Community Solar Garden","City":"Moorhead","State":"MN","Address":"2901 S. Frontage Rd, Moorhead, MN","Utility":"Moorhead Public Service","Utility Type":"Municipal","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2009"},{"UtilityID":"12894","Project Name":"2017 Community Solar Garden","City":"Moorhead","State":"MN","Address":"2902 S. Frontage Rd, Moorhead, MN","Utility":"Moorhead Public Service","Utility Type":"Municipal","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2011"},{"UtilityID":"12894","Project Name":"2017 Concordia's Community Solar Garden","City":"Moorhead","State":"MN","Address":"2903 S. Frontage Rd, Moorhead, MN","Utility":"Moorhead Public Service","Utility Type":"Municipal","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.31","System Size (MW-DC)":"0.40","Year of Interconnection":"2015"},{"UtilityID":"12894","Project Name":"2017 MSUM's Community Solar Garden","City":"Moorhead","State":"MN","Address":"2904 S. Frontage Rd, Moorhead, MN","Utility":"Moorhead Public Service","Utility Type":"Municipal","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2012"},{"UtilityID":"1233","Project Name":"Barnesville Community Solar Garden","City":"Barnesville","State":"MN","Address":"800 2nd Ave SW, Barnesville, MN 56514","Utility":"City of Barnesville - (MN)","Utility Type":"Municipal","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.20","Year of Interconnection":"2015"},{"UtilityID":"2911","Project Name":"WFEC-CVEC Seminole Array","City":"Seminole","State":"OK","Address":"11277 OK-99, Seminole, OK 74868","Utility":"Canadian Valley Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2015"},{"UtilityID":"2911","Project Name":"WFEC-CVEC Shawnee Array","City":"Shawnee","State":"OK","Address":"11284 OK-99, Prague, OK 74864","Utility":"Canadian Valley Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"16606","Project Name":"Colleton Solar Farm","City":"Moncks Corner","State":"SC","Address":"1751 Hiers Corner Road, Walterboro, SC 29488","Utility":"Santee Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2016"},{"UtilityID":"5111","Project Name":"Detroit Lakes Community Solar Garden","City":"Detroit Lakes","State":"MN","Address":"1426 Terry St, Detroit Lakes, MN 56501","Utility":"Detroit Lakes Public Utilities","Utility Type":"Municipal","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"10.00","System Size (MW-DC)":"13.00","Year of Interconnection":"2021"},{"UtilityID":"40307","Project Name":"Spoon River Solar Farm","City":"Astoria","State":"IL","Address":"930\u202fS 5th Ave, Canton, IL 61520 ","Utility":"Prairie Power, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2018"},{"UtilityID":"3436","Project Name":"Solar Up North Alliance","City":"Grawn","State":"MI","Address":"5930 US-31, Grawn, MI 49637","Utility":"Cherryland Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.30","System Size (MW-DC)":"0.39","Year of Interconnection":"2016"},{"UtilityID":"3250","Project Name":"Central Electric Community Solar","City":"Sanford","State":"NC","Address":"128 Wilson Road, Sanford, NC 27332","Utility":"Central Electric Membership Corp. - (NC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.90","System Size (MW-DC)":"2.47","Year of Interconnection":"2018"},{"UtilityID":"2982","Project Name":"Cape Hatteras Electric Cooperative Community Solar","City":"Hatteras","State":"NC","Address":"North Carolina 12 Mile Marker, 71, Hatteras, NC 27943","Utility":"Cape Hatteras Elec Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2019"},{"UtilityID":"40165","Project Name":"Mid-Valley Community Solar Array","City":"St. George","State":"UT","Address":"175 E 200 N St. George, UT 84770","Utility":"Dixie Escalante R E A, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2016"},{"UtilityID":"14238","Project Name":"Holly Springs Community Solar","City":"Bearden","State":"AR","Address":"700 Bradley Ferry Rd, Camden, AR 71701","Utility":"Ouachita Electric Coop Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.06","System Size (MW-DC)":"0.08","Year of Interconnection":"2018"},{"UtilityID":"14289","Project Name":"Ozarks Natural Energy","City":"Springdale","State":"AR","Address":"2154 Boulder Dr, Springdale, AR 72764","Utility":"Ozarks Electric Coop Corp - (AR)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2011"},{"UtilityID":"16572","Project Name":"Salt River Project Community Solar","City":"Phoenix","State":"AZ","Address":"4750 N Vail Rd, Coolidge, AZ 85128","Utility":"Salt River Project","Utility Type":"Political Subdivision","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.14","System Size (MW-DC)":"0.18","Year of Interconnection":"2017"},{"UtilityID":"694","Project Name":"Anza Solar Farm","City":"Anza","State":"CA","Address":"58470 CA-371, Anza, CA 92539","Utility":"Anza Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.66","System Size (MW-DC)":"0.86","Year of Interconnection":"2011"},{"UtilityID":"15308","Project Name":"Pluman-Sierra Community Solar","City":"Herlong","State":"CA","Address":"74\u202fC Street, Herlong, CA\u202f96113","Utility":"Plumas-Sierra Rural Elec Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.86","System Size (MW-DC)":"2.42","Year of Interconnection":"2016"},{"UtilityID":"15257","Project Name":"Coyote Ridge Community Solar Farm (GRID Alternatives, Low Income)","City":"Fort Collins","State":"CO","Address":"7649 Rea Pkwy, Fort Collins, CO 80528","Utility":"Poudre Valley Rural Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2011"},{"UtilityID":"5086","Project Name":"Delta Montrose Community Solar Array","City":"Montrose","State":"CO","Address":"11925 6300 Road, Montrose, CO 81401","Utility":"Delta Montrose Electric Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.05","System Size (MW-DC)":"1.36","Year of Interconnection":"2017"},{"UtilityID":"5086","Project Name":"DMEA GRID Alternatives Array (Low Income)","City":"Montrose","State":"CO","Address":"11925 6300 Rd, Montrose, CO 81401","Utility":"Delta-Montrose Electric Assn.","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2015"},{"UtilityID":"10539","Project Name":"Durango Solar Garden 1","City":"Ignacio","State":"CO","Address":" 45\u202fStewart St, Durango, CO\u202f81303","Utility":"La Plata Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2015"},{"UtilityID":"10539","Project Name":"Durango Solar Garden 2","City":"Durango","State":"CO","Address":"100 Moose Ln, Durango, CO 81303","Utility":"La Plata Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2017"},{"UtilityID":"5862","Project Name":"EEA/GRID CO Solar Garden","City":"Cortez","State":"CO","Address":"801 N Broadway, Cortez, CO 81321","Utility":"Empire Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"2.08","System Size (MW-DC)":"2.70","Year of Interconnection":"2017"},{"UtilityID":"8773","Project Name":"Garfield County Airport Solar Array","City":"Rifle","State":"CO","Address":"375 Co Rd 352, Rifle, CO 81650","Utility":"Holy Cross Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.19","Year of Interconnection":"2016"},{"UtilityID":"7563","Project Name":"Grand Valley Power Solar Farm","City":"Grand Junction","State":"CO","Address":"845 22 Road, Grand Junction, CO 81505","Utility":"Grand Valley Power Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.11","System Size (MW-DC)":"0.14","Year of Interconnection":"2016"},{"UtilityID":"7563","Project Name":"GVP Phase 1","City":"Grand Junction","State":"CO","Address":"845 22 Road, Grand Junction, CO 81505","Utility":"Grand Valley Power Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.64","System Size (MW-DC)":"0.83","Year of Interconnection":"2015"},{"UtilityID":"7563","Project Name":"GVP Phase 2","City":"Grand Junction","State":"CO","Address":"845 22 Road, Grand Junction, CO 81505","Utility":"Grand Valley Power Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.66","System Size (MW-DC)":"0.85","Year of Interconnection":"2015"},{"UtilityID":"7563","Project Name":"GVP Phase 3","City":"Grand Junction","State":"CO","Address":"845 22 Road, Grand Junction, CO 81505","Utility":"Grand Valley Power Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2016"},{"UtilityID":"8773","Project Name":"HCE Community Solar","City":"Gypsum","State":"CO","Address":"0132 Buckhorn Valley Blvd, Gypsum, CO 81637","Utility":"Holy Cross Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.30","System Size (MW-DC)":"1.69","Year of Interconnection":"2018"},{"UtilityID":"8773","Project Name":"HCE Community Solar Array 4","City":"Rifle","State":"CO","Address":"3799 Highway 82, Glenwood Springs, CO 81602","Utility":"Holy Cross Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"20576","Project Name":"Meeker Solar Garden","City":"Meeker","State":"CO","Address":"450 School St, Meeker, CO 81641","Utility":"White River Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2014"},{"UtilityID":"16622","Project Name":"Paradox Valley Solar Array","City":"Bedrock","State":"CO","Address":"445 W Gunnison Ave, Suite 221, Grand Junction, CO","Utility":"San Miguel Power Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"20576","Project Name":"Piceance Creek Solar Farm","City":"Meeker","State":"CO","Address":"567 Co Rd 83, Meeker, CO 81641","Utility":"White River Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":""},{"UtilityID":"15257","Project Name":"PVREA Headquarters Solar Array","City":"Fort Collins","State":"CO","Address":"7649 Rea Pkwy, Fort Collins, CO 80528","Utility":"Poudre Valley Rural Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2014"},{"UtilityID":"15257","Project Name":"PVREA Solar Array 2","City":"Fort Collins","State":"CO","Address":"7649 REA Parkway, Fort Collins, CO 80528","Utility":"Poudre Valley Rural Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2015"},{"UtilityID":"16622","Project Name":"San Miguel Power Association Solar Garden","City":"Norwood","State":"CO","Address":"1120 Summit St, Norwood, CO 81423","Utility":"San Miguel Power Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"5862","Project Name":"Solar Assist Cooperative Garden","City":"Cortez","State":"CO","Address":"801 North Broadway, Cortez, CO 81321","Utility":"Empire Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.13","Year of Interconnection":"2012"},{"UtilityID":"8773","Project Name":"Sunnyside Ranch Community Solar Array","City":"Carbondale","State":"CO","Address":"4003 Co Rd 100, Carbondale, CO 81623","Utility":"Holy Cross Electric Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.11","System Size (MW-DC)":"0.14","Year of Interconnection":"2019"},{"UtilityID":"7787","Project Name":"Town of Crested Butte Array","City":"Crested Butte","State":"CO","Address":"801 Butte Ave, Crested Butte, CO 81224","Utility":"Gunnison County Elec Assn.","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2016"},{"UtilityID":"21081","Project Name":"Yampa Valley Solar Garden","City":"Steamboat","State":"CO","Address":"2211 Elk River Road, Steamboat Springs, CO 80487","Utility":"Yampa Valley Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2017"},{"UtilityID":"21081","Project Name":"YVEA Community Solar Array","City":"Craig","State":"CO","Address":"3715 E US\u201140, Craig, CO 81625","Utility":"Yampa Valley Electric Association","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":""},{"UtilityID":"5070","Project Name":"Bruce A. Henry Solar Farm","City":"Georgetown","State":"DE","Address":"23031 E. Trap Pond Road, Georgetown, DE 19947","Utility":"Delaware Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.09","System Size (MW-DC)":"0.12","Year of Interconnection":"2017"},{"UtilityID":"3502","Project Name":"CHELCO Colar Farm","City":"Defuniak Springs","State":"FL","Address":"655 US Hwy 331N, Defuniak Springs, FL 32433","Utility":"Choctawhatche Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2016"},{"UtilityID":"6443","Project Name":"Crawl Key array","City":"Marathon","State":"FL","Address":"56631 Overseas Highway, Crawl Key, FL","Utility":"Florida Keys El Coop Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.24","System Size (MW-DC)":"0.31","Year of Interconnection":"2017"},{"UtilityID":"21554","Project Name":"Hardee County","City":"Bowling Green","State":"FL","Address":"6697 N County Road 663, Bowling Green, FL 33834","Utility":"Seminole Electric Cooperative Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2016"},{"UtilityID":"31833","Project Name":"Hilliard Community Solar","City":"Hilliard","State":"FL","Address":"458442 Old Dixie Hwy, Hilliard, FL 32046","Utility":"Okefenoke Rural El Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.07","System Size (MW-DC)":"0.10","Year of Interconnection":"2008"},{"UtilityID":"6443","Project Name":"Marathon array","City":"Marathon","State":"FL","Address":"3421 Overseas Highway, Marathon, FL","Utility":"Florida Keys El Coop Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.16","System Size (MW-DC)":"0.21","Year of Interconnection":"2016"},{"UtilityID":"407","Project Name":"Altamaha Cooperative Solar","City":"Lyons","State":"GA","Address":"2059 Kinlaw Rd, Kingsland, GA 31548","Utility":"Altamaha Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2015"},{"UtilityID":"3843","Project Name":"Coastal - Liberty County","City":"Midway","State":"GA","Address":"1265 S Coastal Hwy 17 s, Midway, GA 31320","Utility":"Coastal Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"3843","Project Name":"Coastal - McIntosh County","City":"Darien","State":"GA","Address":"1265 S Coastal Hwy, Midway, GA 31320","Utility":"Coastal Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":""},{"UtilityID":"3843","Project Name":"Coastal Electric Coop Community Solar","City":"Midway","State":"GA","Address":"611 W Liberty Ave, Lyons, GA 30436","Utility":"Coastal Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.10","Year of Interconnection":"2016"},{"UtilityID":"31833","Project Name":"Glynn County Community Solar","City":"Brunswick","State":"GA","Address":"West Glynn Solar Farm, Brunswick, GA 31523","Utility":"Okefenoke Rural El Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.67","System Size (MW-DC)":"1.13","Year of Interconnection":"2017"},{"UtilityID":"7090","Project Name":"GreyStone Solar Farm","City":"Hiram","State":"GA","Address":"7981 Ridge Rd, Hiram, GA 30141","Utility":"GreyStone Power Corporation","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.94","System Size (MW-DC)":"1.22","Year of Interconnection":"2016"},{"UtilityID":"9431","Project Name":"Irwin EMC Cooperative Solar Field","City":"Fitzgerald","State":"GA","Address":"158 Ocilla Hwy, Fitzgerald, GA 31750","Utility":"Irwin Electric Membership Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.18","System Size (MW-DC)":"0.23","Year of Interconnection":"2017"},{"UtilityID":"31833","Project Name":"Kingsland Community Solar","City":"Kingsland","State":"GA","Address":"1265 S Coastal Hwy, Midway, GA 31320","Utility":"Okefenoke Rural El Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.92","System Size (MW-DC)":"1.20","Year of Interconnection":"2015"},{"UtilityID":"12472","Project Name":"Middle Georgia Community Solar","City":"Vienna","State":"GA","Address":"600 Tippettville Rd, Vienna, GA 31092","Utility":"Middle Georgia El Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"16674","Project Name":"Satilla REMC Cooperative Solar","City":"Alma","State":"GA","Address":"928 GA\u201132 E, Alma, GA 31510","Utility":"Satilla Rural Elec Member Corporation","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"18956","Project Name":"Tri-County EMC ourSolar","City":"Eatonton","State":"GA","Address":"112 Recreation Park Rd, Eatonton, GA 31024","Utility":"Tri-County Elec Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"20065","Project Name":"Walton I Cooperative Solar","City":"Monroe","State":"GA","Address":"842 US-78, Monroe, GA 30655","Utility":"Walton Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"20065","Project Name":"Walton II Cooperative Solar","City":"Monroe","State":"GA","Address":"842 US-78, Monroe, GA 30655","Utility":"Walton Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"20065","Project Name":"Walton III Cooperative Solar","City":"Monroe","State":"GA","Address":"1474 Ike Stone Rd\nMonroe, Georgia","Utility":"Walton Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"329","Project Name":"ACEC SunSource","City":"Postville","State":"IA","Address":"229 IA-51, Postville, IA 52162","Utility":"Allamakee-Clayton El Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"7303","Project Name":"Coon Rapids Array","City":"Coon Rapids","State":"IA","Address":"30551 IA-141, Coon Rapids, IA 50058","Utility":"Raccoon Valley Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"19437","Project Name":"Denison Cooperative Solar","City":"Denison","State":"IA","Address":"809 IA-39, Denison, IA 51442","Utility":"Western Iowa Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"6168","Project Name":"FEC Community Solar Garden","City":"Kalona","State":"IA","Address":"71, Hatteras Village, NC 27943","Utility":"Farmers Electric Coop - (IA)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.16","Year of Interconnection":"2017"},{"UtilityID":"6722","Project Name":"Franklin Community Solar Garden","City":"Hampton","State":"IA","Address":"1228 U.S. Highway\u202f65, Hampton, IA\u202f50441","Utility":"Franklin Rural Electric Coop - (IA)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"8283","Project Name":"Harrison County REC","City":"Woodbine","State":"IA","Address":"3079 Easton Trail, Woodbine, IA 51579","Utility":"Harrison County REC","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2018"},{"UtilityID":"8319","Project Name":"Heartland Community Solar","City":"St. Ansgar","State":"IA","Address":"1605 US-218, St Ansgar, IA 50472","Utility":"Heartland Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.07","System Size (MW-DC)":"0.09","Year of Interconnection":"2016"},{"UtilityID":"12450","Project Name":"Midland Power Community Solar","City":"Iowa Falls","State":"IA","Address":"730 South River Street, Iowa Falls, IA","Utility":"Midland Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2015"},{"UtilityID":"19437","Project Name":"Onawa Cooperative Solar","City":"Onawa","State":"IA","Address":"418 E Iowa Ave, Onawa, IA 51040","Utility":"Western Iowa Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2015"},{"UtilityID":"15291","Project Name":"Prairie Energy Community Solar Program","City":"Clarion","State":"IA","Address":"2551 230th St, Clarion, IA 50525","Utility":"Prairie Energy Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":"2017"},{"UtilityID":"19157","Project Name":"Renewable Rays - Cresco","City":"Cresco","State":"IA","Address":"24049 IA\u20119, Cresco, IA 52136","Utility":"MiEnergy Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.06","System Size (MW-DC)":"0.08","Year of Interconnection":"2017"},{"UtilityID":"14202","Project Name":"Sterler Community Solar Park","City":"Sibley","State":"IA","Address":"5463 130th St, Sibley, IA 51249","Utility":"Osceola Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.27","System Size (MW-DC)":"0.35","Year of Interconnection":"2016"},{"UtilityID":"10454","Project Name":"Kootenai Community Solar Project","City":"Worley","State":"ID","Address":"18182 West Setters Road, Worley, Idaho","Utility":"Kootenai Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":""},{"UtilityID":"13758","Project Name":"Northern Lights Community Solar","City":"Sagle","State":"ID","Address":"421 Chevy St, Sagle, ID 83860","Utility":"Northern Lights, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.86","System Size (MW-DC)":"1.12","Year of Interconnection":"2012"},{"UtilityID":"40211","Project Name":"Co-op Solar","City":"Paris","State":"IL","Address":"11597 IL Highway 1, Paris, IL 61944","Utility":"Wabash Valley Power Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.09","System Size (MW-DC)":"0.12","Year of Interconnection":"2016"},{"UtilityID":"40307","Project Name":"Shelby Solar Farm","City":"Shelbyville","State":"IL","Address":"Solar Power Plant, Shelbyville, IL 62565","Utility":"Prairie Power, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2014"},{"UtilityID":"40211","Project Name":"Co-op Solar","City":"LaOtto","State":"IN","Address":"220 Co Rd 70, Laotto, IN 46763","Utility":"Wabash Valley Power Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"40211","Project Name":"Co-op Solar","City":"Peru","State":"IN","Address":"3086 W 100 N, Peru, IN 46970","Utility":"Wabash Valley Power Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.07","Year of Interconnection":"2015"},{"UtilityID":"40211","Project Name":"Co-op Solar","City":"Wanatah","State":"IN","Address":"8642 W, US-30, Wanatah, IN 46390","Utility":"Wabash Valley Power Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.07","Year of Interconnection":"2016"},{"UtilityID":"9267","Project Name":"MySolar","City":"Columbus","State":"IN","Address":"2457 W 625 S, Columbus, IN 47201","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"5.40","System Size (MW-DC)":"7.02","Year of Interconnection":""},{"UtilityID":"9267","Project Name":"MySolar","City":"Dale","State":"IN","Address":"4773 County Rd 2100 N, Dale, IN 47523","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.44","System Size (MW-DC)":"0.75","Year of Interconnection":"2016"},{"UtilityID":"9267","Project Name":"MySolar","City":"Ellettsville","State":"IN","Address":"8439 W SR 46, Ellettsville, IN 47429","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"2.50","System Size (MW-DC)":"3.25","Year of Interconnection":"2017"},{"UtilityID":"9267","Project Name":"MySolar","City":"Lanesville","State":"IN","Address":"4900 Farnsley Road, Lanesville, IN 47136","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.16","System Size (MW-DC)":"0.21","Year of Interconnection":"2017"},{"UtilityID":"9267","Project Name":"MySolar","City":"New Castle","State":"IN","Address":"955 W CR 500 S, New Castle, IN 47362","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.10","Year of Interconnection":"2016"},{"UtilityID":"9267","Project Name":"MySolar","City":"Newberry","State":"IN","Address":"7700 S Maple Flats Rd, Newberry, IN 47449","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.09","System Size (MW-DC)":"0.12","Year of Interconnection":"2012"},{"UtilityID":"9267","Project Name":"MySolar","City":"Trafalgar","State":"IN","Address":"2457\u202fS SR\u202f135, Trafalgar, IN\u202f46181","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.48","System Size (MW-DC)":"0.63","Year of Interconnection":"2015"},{"UtilityID":"9267","Project Name":"MySolar","City":"Underwood","State":"IN","Address":"217 Henretty Road, Underwood, IN 47177","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.14","System Size (MW-DC)":"0.23","Year of Interconnection":""},{"UtilityID":"40211","Project Name":"MySolar","City":"Mitchell","State":"IN","Address":"1000 S Old Palestine Road, Mitchell, IN 47446","Utility":"Hoosier Energy R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2014"},{"UtilityID":"8000","Project Name":"NineStar Community Solar Farm","City":"Greenfield","State":"IN","Address":"2243 East Main Street, Greenfield, IN 46140","Utility":"NineStar Connect","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.06","System Size (MW-DC)":"0.07","Year of Interconnection":"2014"},{"UtilityID":"20603","Project Name":"Northeastern REMC Community Solar","City":"Columbia City","State":"IN","Address":"4901 E Park 30 Dr, Columbia City, IN","Utility":"Northeastern Rural E M C","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.16","Year of Interconnection":"2017"},{"UtilityID":"18940","Project Name":"Tipmont REMC Community Solar","City":"Linden","State":"IN","Address":"403 S Main St, Linden, IN","Utility":"Tipmont Rural Elec Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.09","System Size (MW-DC)":"0.11","Year of Interconnection":"2015"},{"UtilityID":"12524","Project Name":"Midwest Community Solar Array 1","City":"Colby","State":"KS","Address":"410 Veterans Memorial Dr, Colby, KS 67701","Utility":"Midwest Energy Inc.","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.20","System Size (MW-DC)":"1.56","Year of Interconnection":"2016"},{"UtilityID":"19396","Project Name":"Homeworks Community Solar Garden","City":"Portland","State":"MI","Address":"7973 E. Grand River Ave, Portland, MI 48875","Utility":"Tri-County Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"15.38","System Size (MW-DC)":"26.00","Year of Interconnection":"2011"},{"UtilityID":"20910","Project Name":"Spartan Solar","City":"Cadillac","State":"MI","Address":"10125 W Watergate Rd, Cadillac, MI 49601","Utility":"Wolverine Power Supply Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.20","Year of Interconnection":"2017"},{"UtilityID":"12377","Project Name":"SpartanSolar-MEC","City":"Cassopolis","State":"MI","Address":"60590 Decatur Rd, Cassopolis, MI 49031","Utility":"Midwest Energy and Communications","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2016"},{"UtilityID":"887","Project Name":"AECI headquarters","City":"Lutsen","State":"MN","Address":"5401 West Highway 61, Lutsen, MN 55612","Utility":"Arrowhead Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.20","Year of Interconnection":"2016"},{"UtilityID":"4577","Project Name":"Community Solar Phase 1","City":"Brainerd","State":"MN","Address":"17330 State Hwy 371 N, Brainerd, MN 56401","Utility":"Crow Wing Cooperative Power & Light Comp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2019"},{"UtilityID":"4577","Project Name":"Community Solar Phase 2","City":"Brainerd","State":"MN","Address":"17331 State Hwy 371 N, Brainerd, MN 56401","Utility":"Crow Wing Cooperative Power & Light Comp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.50","System Size (MW-DC)":"0.65","Year of Interconnection":"2015"},{"UtilityID":"10618","Project Name":"HQ Prairie solar project","City":"Pelican Rapids","State":"MN","Address":"1401 S Broadway, Pelican Rapids, MN 56572","Utility":"Lake Region Electric Cooperative - (MN)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.00","System Size (MW-DC)":"0.01","Year of Interconnection":"2011"},{"UtilityID":"10618","Project Name":"LREC Community Solar Phase 2","City":"Pelican Rapids","State":"MN","Address":"1401 S Broadway, Pelican Rapids, MN 56572","Utility":"Lake Region Electric Cooperative - (MN)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"4.00","System Size (MW-DC)":"5.20","Year of Interconnection":"2018"},{"UtilityID":"11910","Project Name":"McLeod Co-op Community Solar","City":"Glencoe","State":"MN","Address":"3515 11th St E, Glencoe, MN 55336","Utility":"McLeod Cooperative Power Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.10","Year of Interconnection":"2015"},{"UtilityID":"12227","Project Name":"Meeker Cooperative\u2019s Solar","City":"Litchfield","State":"MN","Address":"62967 MN-24, Litchfield, MN 55355","Utility":"Meeker Coop Light & Power Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.13","System Size (MW-DC)":"0.17","Year of Interconnection":"2015"},{"UtilityID":"13700","Project Name":"North Itasca Community Solar","City":"Bigfork","State":"MN","Address":"301 Main Ave, Bigfork, MN 56628","Utility":"North Itasca Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2016"},{"UtilityID":"1529","Project Name":"Northern Solar","City":"Bemidji","State":"MN","Address":"4111 Technology Dr NW, Bemidji, MN 56601","Utility":"Beltrami Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2016"},{"UtilityID":"14468","Project Name":"People's Community Solar","City":"Elgin","State":"MN","Address":"620 Industrial Dr SE, Elgin, MN 55932","Utility":"People's Cooperative Services","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2016"},{"UtilityID":"15750","Project Name":"Redwood Electric Community Solar","City":"Lamberton","State":"MN","Address":"24500 US-14, Lamberton, MN 56152","Utility":"Redwood Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2016"},{"UtilityID":"19157","Project Name":"Renewable Rays - Rushford","City":"Rushford","State":"MN","Address":"31110 Cooperative Way, Rushford Village, MN 55971","Utility":"MiEnergy Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2016"},{"UtilityID":"689","Project Name":"SolarWise","City":"Ramsey","State":"MN","Address":"14601 Ramsey Blvd NW, Ramsey, MN 55303","Utility":"Connexus Energy","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2016"},{"UtilityID":"4346","Project Name":"SolarWise","City":"Two Harbors","State":"MN","Address":"1554 Highway 2, Two Harbors, MN 55616","Utility":"Cooperative Light and Power","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.18","System Size (MW-DC)":"0.23","Year of Interconnection":"2017"},{"UtilityID":"9991","Project Name":"SolarWise","City":"Spicer","State":"MN","Address":"8605 47th St NE, Spicer, MN 56288","Utility":"Kandiyohi Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.12","System Size (MW-DC)":"1.46","Year of Interconnection":"2016"},{"UtilityID":"18019","Project Name":"SolarWise","City":"St. Joseph","State":"MN","Address":"29643 Frontage Road, St. Joseph, MN 56374","Utility":"Stearns Cooperative Elec Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.67","System Size (MW-DC)":"0.87","Year of Interconnection":"2018"},{"UtilityID":"18047","Project Name":"SolarWise","City":"Owatonna","State":"MN","Address":"2411 W. Bridge St, Owatonna, MN 55060","Utility":"Steele-Waseca Cooperative Electric","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.18","System Size (MW-DC)":"0.23","Year of Interconnection":"2016"},{"UtilityID":"9475","Project Name":"SolarWise","City":"Park Rapids","State":"MN","Address":"16930 County 6, Park Rapids, MN 56470","Utility":"Itasca-Mantrap Co-op Electrical Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.13","Year of Interconnection":"2014"},{"UtilityID":"16368","Project Name":"Solarwise","City":"Alexandria","State":"MN","Address":"6839 Power Ln SW, Alexandria, MN 56308","Utility":"Runestone Electric Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"2.00","System Size (MW-DC)":"2.60","Year of Interconnection":"2017"},{"UtilityID":"17550","Project Name":"South Central Electric Community solar array","City":"Lake Crystal","State":"MN","Address":"19322 499th Ave, Lake Crystal, MN 56055","Utility":"South Central Electric Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.15","System Size (MW-DC)":"0.26","Year of Interconnection":"2017"},{"UtilityID":"20996","Project Name":"WH Project 1","City":"Rockford","State":"MN","Address":"6800 Electric Dr, Rockford, MN 55373","Utility":"Wright-Hennepin Coop Elec Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.38","System Size (MW-DC)":"1.79","Year of Interconnection":"2015"},{"UtilityID":"20996","Project Name":"WH Project 2","City":"Rockford","State":"MN","Address":"6800 Electric Dr, Rockford, MN 55373","Utility":"Wright-Hennepin Coop Elec Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.14","Year of Interconnection":"2017"},{"UtilityID":"20996","Project Name":"WH Project 3","City":"Rockford","State":"MN","Address":"6800 Electric Drive, Rockford, MN 55373","Utility":"Wright-Hennepin Coop Elec Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"20996","Project Name":"WH Project 4","City":"Medina","State":"MN","Address":"6800 Electric Drive, Rockford, MN 55373","Utility":"Wright-Hennepin Coop Elec Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.98","System Size (MW-DC)":"2.57","Year of Interconnection":"2016"},{"UtilityID":"2001","Project Name":"Boone Electric Community Solar Farm","City":"Columbia","State":"MO","Address":"1413 Rangeline St, Columbia, MO 65201","Utility":"Boone Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2016"},{"UtilityID":"40211","Project Name":"Co-op Solar","City":"Ste. Genevieve\n","State":"MO","Address":"1500 Rand Ave, Perryville, MO 63775","Utility":"Wabash Valley Power Assn, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.18","System Size (MW-DC)":"1.54","Year of Interconnection":"2016"},{"UtilityID":"15138","Project Name":"Solartech","City":"Kearney","State":"MO","Address":"1000 W State Route 92, Kearney, MO 64060","Utility":"Platte-Clay Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2014"},{"UtilityID":"6395","Project Name":"Community Solar Phase II","City":"Kalispell","State":"MT","Address":"35 Terry Rd, Kalispell, MT 59901","Utility":"Flathead Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2015"},{"UtilityID":"21513","Project Name":"Cooperative Solar","City":"Lewistown","State":"MT","Address":"84423 US-87, Lewistown, MT 59457","Utility":"Fergus Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.10","Year of Interconnection":"2015"},{"UtilityID":"12692","Project Name":"MEC Solarshare K3 Garden","City":"Bonner","State":"MT","Address":"605 Cold Smoke Ave, Bonner, MT 59823","Utility":"Missoula Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.01","System Size (MW-DC)":"0.02","Year of Interconnection":"2018"},{"UtilityID":"12692","Project Name":"Phase I","City":"Lolo","State":"MT","Address":"605 Cold Smoke Ave, Bonner, MT 59823","Utility":"Missoula Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"12692","Project Name":"Phase II","City":"Frenchtown","State":"MT","Address":"30 Frenchtown Rd, Trumbull, CT 06611","Utility":"Missoula Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2017"},{"UtilityID":"1417","Project Name":"SHARES DU SOLEIL","City":"Red Lodge","State":"MT","Address":"1306 Broadway Ave N, Red Lodge, MT 59068","Utility":"Beartooth Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"9.90","System Size (MW-DC)":"12.87","Year of Interconnection":"2019"},{"UtilityID":"6395","Project Name":"Solar Utility Network (SUN)","City":"Kalispell","State":"MT","Address":"1840 Whitefish Stage Rd, Kalispell, MT 59901","Utility":"Flathead Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.07","Year of Interconnection":"2015"},{"UtilityID":"26916","Project Name":"Valley Solar","City":"Victor","State":"MT","Address":"143 Bell Xing West, Victor, MT 59875","Utility":"Ravalli County Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2015"},{"UtilityID":"1889","Project Name":"Alleghany Community Solar","City":"Sparta","State":"NC","Address":"1889 Hwy 21 S, Sparta, NC 28675","Utility":"Blue Ridge Elec Member Corp - (NC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"2.50","System Size (MW-DC)":"3.25","Year of Interconnection":"2016"},{"UtilityID":"1889","Project Name":"Ashe Community Solar","City":"Jefferson","State":"NC","Address":"2375 NC Hwy 163, West Jefferson, NC 28694","Utility":"Blue Ridge Elec Member Corp - (NC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"3.00","System Size (MW-DC)":"3.90","Year of Interconnection":"2017"},{"UtilityID":"24889","Project Name":"Brunswick Electric Member Corp Community Solar 1","City":"Chadbourn","State":"NC","Address":"2681 Georgia Pacific Rd, Chadbourn, NC 28431","Utility":"Brunswick Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.09","System Size (MW-DC)":"0.12","Year of Interconnection":"2016"},{"UtilityID":"24889","Project Name":"Brunswick Electric Member Corp Community Solar 2","City":"Bolivia","State":"NC","Address":"4755 Ocean Hwy E, Bolivia, NC 28422","Utility":"Brunswick Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.13","System Size (MW-DC)":"0.16","Year of Interconnection":"2017"},{"UtilityID":"1889","Project Name":"Kings Creek Community Solar","City":"Lenoir","State":"NC","Address":"3271 Wilkesboro Blvd, Lenoir, NC 28645","Utility":"Blue Ridge Elec Member Corp - (NC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"1889","Project Name":"Patterson Community Solar","City":"Lenoir","State":"NC","Address":"100 Cooperative Way, Lenoir, NC 28645","Utility":"Blue Ridge Elec Member Corp - (NC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2017"},{"UtilityID":"14717","Project Name":"Pee Dee Solar","City":"Wadesboro","State":"NC","Address":"575 US-52, Wadesboro, NC 28170","Utility":"Pee Dee Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"15023","Project Name":"Piedmont Community Solar","City":"Roxboro","State":"NC","Address":"1125 Oxford Road, Roxboro, NC 27573","Utility":"Piedmont Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.13","System Size (MW-DC)":"0.16","Year of Interconnection":"2017"},{"UtilityID":"16101","Project Name":"Roanoke SolarShare","City":"Aulander","State":"NC","Address":"518 NC Hwy 561 West, Aulander, NC 27805","Utility":"Roanoke Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"15671","Project Name":"SunPath","City":"Asheboro","State":"NC","Address":"879 McDowell Road, Asheboro, NC 27204","Utility":"Randolph Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"19108","Project Name":"Tideland EMC Community Solar Phase I","City":"Pinetown","State":"NC","Address":"25831 US\u2011264 E, Pantego, NC 27860","Utility":"Tideland Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"19108","Project Name":"Tideland EMC Community Solar Phase II","City":"Pinetown","State":"NC","Address":"25831 Hwy 264 East, Pantego, NC 27860","Utility":"Tideland Electric Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2017"},{"UtilityID":"1889","Project Name":"Watagua Community Solar","City":"Boone","State":"NC","Address":"2491 US Hwy 421 S, Boone, NC 28607","Utility":"Blue Ridge Elec Member Corp - (NC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.04","Year of Interconnection":"2013"},{"UtilityID":"24949","Project Name":"Prairie Sun Community Solar","City":"Fargo","State":"ND","Address":"5400 block of 63rd Street S, Fargo, ND 58104","Utility":"Cass County Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.04","Year of Interconnection":"2014"},{"UtilityID":"13441","Project Name":"NH SolarShares - Appleknockers General Store","City":"Warren","State":"NH","Address":"230 NH-25, Warren, NH 03279","Utility":"New Hampshire Elec Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.21","Year of Interconnection":"2016"},{"UtilityID":"13441","Project Name":"NH SolarShares - Frosty Scoops/Common Man","City":"Plymouth","State":"NH","Address":"231 Main St, Plymouth, NH 03264","Utility":"New Hampshire Elec Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.21","Year of Interconnection":"2017"},{"UtilityID":"10378","Project Name":"KCEC Community Solar Program","City":"Taos","State":"NM","Address":"1303 Paseo Del Ca\u00f1on E, Taos, NM 87571","Utility":"Kit Carson Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.40","System Size (MW-DC)":"0.52","Year of Interconnection":"2014"},{"UtilityID":"2651","Project Name":"OurSolar","City":"Oxford","State":"OH","Address":"2662 Lanes Mill Rd Hamilton, Ohio","Utility":"Butler Rural Electric Coop Inc - (OH)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.23","System Size (MW-DC)":"0.31","Year of Interconnection":"2014"},{"UtilityID":"4796","Project Name":"OurSolar","City":"Rossburg","State":"OH","Address":"1120 Fort Jefferson Ave, Greenville, OH 45331","Utility":"Darke Rural Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2011"},{"UtilityID":"8034","Project Name":"OurSolar","City":"Findlay","State":"OH","Address":"7011 Township Rd 215, Findlay, OH 45840","Utility":"Hancock-Wood Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.07","Year of Interconnection":""},{"UtilityID":"10668","Project Name":"OurSolar","City":"Utica","State":"OH","Address":"Washington Township, OH 43080","Utility":"Licking Rural Electric Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.45","System Size (MW-DC)":"0.58","Year of Interconnection":"2015"},{"UtilityID":"11200","Project Name":"OurSolar","City":"Wellington","State":"OH","Address":"1 Cooperative Way, Spencer, OH 44275","Utility":"Lorain-Medina R E C, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.17","System Size (MW-DC)":"0.22","Year of Interconnection":"2017"},{"UtilityID":"12990","Project Name":"OurSolar","City":"Delaware","State":"OH","Address":"4993 State Route 521, Delaware, OH 43015","Utility":"Consolidated Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2013"},{"UtilityID":"13693","Project Name":"OurSolar","City":"Attica","State":"OH","Address":"350 Stump Pike Rd, Attica, OH 44807","Utility":"North Central Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.17","System Size (MW-DC)":"0.22","Year of Interconnection":"2011"},{"UtilityID":"14599","Project Name":"OurSolar","City":"Paulding","State":"OH","Address":"401 McDonald Pike, Paulding, OH 45879","Utility":"Paulding-Putman Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2016"},{"UtilityID":"15054","Project Name":"OurSolar","City":"Urbana","State":"OH","Address":"767 Three Mile Road, Urbana, OH 43078","Utility":"Pioneer Rural Elec Coop, Inc - (OH)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.08","System Size (MW-DC)":"0.13","Year of Interconnection":"2015"},{"UtilityID":"18085","Project Name":"OurSolar","City":"Lancaster","State":"OH","Address":"808 Mill Park Dr, Lancaster, OH 43130","Utility":"South Central Power Company","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.23","System Size (MW-DC)":"0.40","Year of Interconnection":"2014"},{"UtilityID":"19176","Project Name":"OurSolar","City":"Malinta","State":"OH","Address":"8945 County Rd K2, Malinta, OH 43535","Utility":"Tricounty Rural Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.12","System Size (MW-DC)":"0.15","Year of Interconnection":"2016"},{"UtilityID":"36189","Project Name":"OurSolar","City":"Kenton","State":"OH","Address":"1210 W Lima St, Kenton, OH 43326","Utility":"Mid-Ohio Energy Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.05","System Size (MW-DC)":"0.06","Year of Interconnection":"2015"},{"UtilityID":"36189","Project Name":"OurSolar","City":"Marion","State":"OH","Address":"2859 Marion\u2013Upper Sandusky Rd, Marion, OH 43302","Utility":"Mid-Ohio Energy Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"10.37","System Size (MW-DC)":"13.48","Year of Interconnection":"2015"},{"UtilityID":"5598","Project Name":"ECE Community Solar","City":"Okmulgee","State":"OK","Address":"2001 S Wood Drive, Okmulgee, OK 74447","Utility":"East Central Oklahoma Elec Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"17.50","System Size (MW-DC)":"22.75","Year of Interconnection":"2019"},{"UtilityID":"17681","Project Name":"SWRE Community Solar Frederick","City":"Frederick","State":"OK","Address":"1801 Flying Fortress, Frederick, OK 73542","Utility":"Southwest Rural Elec Assn Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.22","System Size (MW-DC)":"1.59","Year of Interconnection":"2011"},{"UtilityID":"19160","Project Name":"TCEC Community Solar","City":"Hooker","State":"OK","Address":"995 Mile 46 Road, Hooker, OK 73945","Utility":"Tri-County Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"4.72","System Size (MW-DC)":"6.14","Year of Interconnection":"2017"},{"UtilityID":"3478","Project Name":"WFEC-Cimarron Electric Array","City":"Kingfisher","State":"OK","Address":"19306 US-81, Kingfisher, OK 73750","Utility":"Cimarron Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.34","System Size (MW-DC)":"0.44","Year of Interconnection":"2018"},{"UtilityID":"4401","Project Name":"WFEC-Cotton Electric Array","City":"Devol","State":"OK","Address":"196747 Co Rd N2500, Devol, OK 73531","Utility":"Cotton Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.06","System Size (MW-DC)":"0.08","Year of Interconnection":"2010"},{"UtilityID":"8183","Project Name":"WFEC-Harmon Electric Array","City":"Hollis","State":"OK","Address":"S Morton St Hollis, OK 73550","Utility":"Harmon Electric Assn Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2019"},{"UtilityID":"10170","Project Name":"WFEC-Kiamichi Electric Array","City":"Wilburton","State":"OK","Address":"944 SW, 966 OK-2, Wilburton, OK 74578","Utility":"Kiamichi Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"13807","Project Name":"WFEC-Northwestern Electric Array","City":"Woodward","State":"OK","Address":"2925 Williams Ave, Woodward, OK 73801","Utility":"Northwestern Electric Coop Inc - (OK)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"14062","Project Name":"WFEC-Oklahoma Electric Array","City":"Norman","State":"OK","Address":"242 24th Ave NW, Norman, OK 73069","Utility":"Oklahoma Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"15746","Project Name":"WFEC-Red River Valley Array","City":"Marietta","State":"OK","Address":"8574 State Hwy 32, Marietta, OK 73448","Utility":"Red River Valley Rrl Elec Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"17603","Project Name":"WFEC-Southeastern Electric Array","City":"Durant","State":"OK","Address":"1514 U.S.70, Durant, OK 74701","Utility":"Southeastern Electric Coop Inc - (OK)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"17681","Project Name":"WFEC-Southwest REC Vernon Array","City":"Tipton","State":"OK","Address":"700 N Broadway Ave, Tipton, OK 73570","Utility":"Southwest Rural Elec Assn Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"10681","Project Name":"Lane Electric\u2019s Community Solar Garden","City":"Eugene","State":"OR","Address":"787 Bailey Hill Road, Eugene, OR 97402","Utility":"Lane Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"3240","Project Name":"Shared Solar","City":"Bend","State":"OR","Address":"61090 SE 27th St, Bend, OR 97702","Utility":"Central Electric Coop Inc - (OR)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"162","Project Name":"Aiken Electric Cooperative, Inc. Solar Program","City":"Aiken","State":"SC","Address":"301 Gateway Dr, Aiken, SC 29803","Utility":"Aiken Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"1890","Project Name":"Blue Ridge Electric Community Solar","City":"Pickens","State":"SC","Address":"734 West Main Street, Pickens, SC 29671","Utility":"Blue Ridge Electric Coop Inc - (SC)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"2212","Project Name":"Broad River Electric Coop Community Solar","City":"Gaffney","State":"SC","Address":"811 Hamrick St, Gaffney, SC 29340","Utility":"Broad River Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"5929","Project Name":"Fairfield Electric Community Solar","City":"Winnsboro","State":"SC","Address":"3129 US\u2011321 North, Winnsboro, SC 29180","Utility":"Fairfield Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"8786","Project Name":"Horry Electric Community Solar","City":"Conway","State":"SC","Address":"2774 Cultra Rd, Conway, SC 29526","Utility":"Horry Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2018"},{"UtilityID":"10768","Project Name":"Laurens Headquarters Farm","City":"Laurens","State":"SC","Address":"2254 SC-14, Laurens, SC 29360","Utility":"Laurens Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.77","System Size (MW-DC)":"2.30","Year of Interconnection":"2014"},{"UtilityID":"21002","Project Name":"Lesslie Community Solar Farm","City":"Rock Hill","State":"SC","Address":"540 E Springdale Rd, Rock Hill, SC 29730","Utility":"York Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"52.00","System Size (MW-DC)":"67.60","Year of Interconnection":"2017"},{"UtilityID":"11019","Project Name":"Little River Community Solar","City":"Abbeville","State":"SC","Address":"300 Cambridge St, Abbeville, SC 29620","Utility":"Little River Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2016"},{"UtilityID":"10768","Project Name":"Mauldin Community Solar Farm","City":"Mauldin","State":"SC","Address":"1201 East Butler Road, Greenville, SC 29607","Utility":"Laurens Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"31.50","System Size (MW-DC)":"40.95","Year of Interconnection":"2020"},{"UtilityID":"14398","Project Name":"New River Community Solar","City":"Hardeeville","State":"SC","Address":"1 Cooperative Way, Hardeeville, SC 29927","Utility":"Palmetto Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2015"},{"UtilityID":"13524","Project Name":"Newberry Electric Cooperative Community Solar","City":"Newberry","State":"SC","Address":"882 Wilson Rd, Newberry, SC 29108","Utility":"Newberry Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2020"},{"UtilityID":"14398","Project Name":"Ridgeland Community Solar","City":"Ridgeland","State":"SC","Address":"4063 Grays Hwy, Ridgeland, SC 29936","Utility":"Palmetto Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"14175","Project Name":"Tri-County Community Solar","City":"St. Matthews","State":"SC","Address":"6473 Old State Rd, St Matthews, SC 29135","Utility":"Tri-County Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"21002","Project Name":"YEC\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u201e\u00a2s East York Community Solar Farm","City":"York","State":"SC","Address":"7640 Park Place Rd, York, SC 29745","Utility":"York Electric Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2018"},{"UtilityID":"727","Project Name":"Co-op Community Solar","City":"New Market","State":"TN","Address":"1109 Hill Dr, New Market, TN 37820","Utility":"Appalachian Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2020"},{"UtilityID":"12470","Project Name":"Cooperative Solar Program","City":"College Grove","State":"TN","Address":"8615 Webb Rd, College Grove, TN 37046","Utility":"Middle Tennessee E M C","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2018"},{"UtilityID":"5399","Project Name":"DREMC Solar Farm","City":"Shelbyville","State":"TN","Address":"1411 Madison Street, Shelbyville, TN 37160","Utility":"Duck River Elec Member Corp","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.27","System Size (MW-DC)":"0.35","Year of Interconnection":"2012"},{"UtilityID":"1175","Project Name":"BEC Community Solar","City":"Leakey","State":"TX","Address":"3172 Highway 16 North Bandera, TX 78003","Utility":"Bandera Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"14626","Project Name":"Cooperative Solar Program","City":"Austin","State":"TX","Address":"9112 Circle Dr Austin, Texas","Utility":"Pedernales Electric Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"5078","Project Name":"CoServ Solar Station","City":"Krugerville","State":"TX","Address":"15554 Ike Byrom Rd, Aubrey, TX 76227","Utility":"Co-Serv Electric","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"19490","Project Name":"Erath","City":"Stephenville","State":"TX","Address":"1209 Co Rd 433 Stephenville, Texas","Utility":"United Electric Coop Service Inc - (TX)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"13830","Project Name":"Roofless Solar","City":"Orange Grove","State":"TX","Address":"5302 W FM 624 at Hwy 281, Orange Grove, TX","Utility":"Nueces Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"7752","Project Name":"SunHub","City":"Gonzales","State":"TX","Address":"825 E Sarah DeWitt Dr, Gonzales, TX 78629","Utility":"Guadalupe Valley Elec Coop Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2011"},{"UtilityID":"12452","Project Name":"Synergy Solar","City":"Bedias","State":"TX","Address":"Co Rd 115, Bedias, TX 77831","Utility":"Mid-South Electric Coop Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.23","System Size (MW-DC)":"0.29","Year of Interconnection":"2014"},{"UtilityID":"19490","Project Name":"United Community Solar plant","City":"Clifton","State":"TX","Address":"252 County Rd 3405, Clifton, TX 76634","Utility":"United Electric Coop Service Inc - (TX)","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2014"},{"UtilityID":"1062","Project Name":"BARC Electric Cooperative Community Solar","City":"Lexington","State":"VA","Address":"1972 Big Spring Drive, Lexington, VA 24450","Utility":"BARC Electric Cooperative Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"3291","Project Name":"Solar Share","City":"Scottsville","State":"VA","Address":"1224 Salem Church Rd, Palmyra, VA 22963","Utility":"Central Virginia Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2018"},{"UtilityID":"19791","Project Name":"Alburgh Solar Farm","City":"Alburgh","State":"VT","Address":"VT\u201178 & Dump Road, Alburgh, VT","Utility":"Vermont Electric Cooperative, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2021"},{"UtilityID":"19791","Project Name":"Hinesburg Project","City":"Hinesburg","State":"VT","Address":"895 Magee Hill Rd, Hinesburg, VT 05461","Utility":"Vermont Electric Cooperative, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.10","System Size (MW-DC)":"0.13","Year of Interconnection":"2016"},{"UtilityID":"1625","Project Name":"Benton REA Co-op Solar","City":"West Richland","State":"WA","Address":"6095 W Van Giesen St, West Richland, WA 99353","Utility":"Benton Rural Electric Assn","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2019"},{"UtilityID":"14170","Project Name":"Community Solar","City":"Anacortes","State":"WA","Address":"668 Decatur Head Dr, Decatur Island, WA 98221","Utility":"Orcas Power & Light Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.76","System Size (MW-DC)":"0.99","Year of Interconnection":"2019"},{"UtilityID":"14668","Project Name":"Harbor Community Solar","City":"Gig Harbor","State":"WA","Address":"13315 Goodnough Dr NW, Gig Harbor, WA 98332","Utility":"Peninsula Light Company","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.13","System Size (MW-DC)":"0.16","Year of Interconnection":"2022"},{"UtilityID":"8699","Project Name":"Inland Community Solar","City":"Spokane","State":"WA","Address":"10110 W. Hallett Road, Spokane, WA 99224","Utility":"Inland Power & Light Company","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"1.00","System Size (MW-DC)":"1.30","Year of Interconnection":"2021"},{"UtilityID":"8699","Project Name":"Inland Community Solar addition","City":"Spokane","State":"WA","Address":"10110 W. Hallett Road, Spokane, WA 99224","Utility":"Inland Power & Light Company","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.50","System Size (MW-DC)":"0.65","Year of Interconnection":"2015"},{"UtilityID":"18448","Project Name":"Tanner Electric Community Solar","City":"North Bend","State":"WA","Address":"\u202f45710 SE North Bend Way, North Bend, WA 98045","Utility":"Tanner Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2010"},{"UtilityID":"14074","Project Name":"Winthrop Community Solar","City":"Winthrop","State":"WA","Address":"93 W Chewuch Road, Winthrop, WA 98862","Utility":"Okanogan County Elec Coop, Inc","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"2.07","System Size (MW-DC)":"2.69","Year of Interconnection":"2017"},{"UtilityID":"1367","Project Name":"Bayfield Electric Solar Garden","City":"Iron River","State":"WI","Address":"68460 District St, Iron River, WI 54847","Utility":"Bayfield Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2017"},{"UtilityID":"18383","Project Name":"Bright Horizons Community Solar Project","City":"Medford","State":"WI","Address":"N 1831 State Hwy 13, Medford, WI 54451","Utility":"Taylor Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2017"},{"UtilityID":"3701","Project Name":"Clark Electric Community Solar","City":"Greenwood","State":"WI","Address":"1209 W Dall\u2011Berg Rd, Greenwood, WI 54437","Utility":"Clark Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2017"},{"UtilityID":"1251","Project Name":"Community Rays Array","City":"Barron","State":"WI","Address":"1420 15th St, Barron, WI 54812","Utility":"Barron Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.02","Year of Interconnection":"2017"},{"UtilityID":"19813","Project Name":"Community Solar Farm","City":"Westby","State":"WI","Address":"110 Saugstad Rd, Westby, WI 54667","Utility":"Vernon Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.02","System Size (MW-DC)":"0.03","Year of Interconnection":"2018"},{"UtilityID":"5632","Project Name":"MemberSolar","City":"Eau Claire","State":"WI","Address":"8214 U.S. Highway 12, Fall Creek, WI 54742","Utility":"Eau Claire Energy Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"3.00","System Size (MW-DC)":"3.90","Year of Interconnection":"2014"},{"UtilityID":"15983","Project Name":"Richland Electric Transitions Community Solar Array","City":"Hillsboro","State":"WI","Address":"14957 Co Hwy A, Hillsboro, WI 54634","Utility":"Richland Electric Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.90","System Size (MW-DC)":"1.17","Year of Interconnection":"2020"},{"UtilityID":"17868","Project Name":"Sunflower 1","City":"Hammond","State":"WI","Address":"1925 Ridgeway Street, Hammond, WI 54015","Utility":"St. Croix Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"13936","Project Name":"SunnyOak Community Solar Garden","City":"Necedah","State":"WI","Address":"N8904 Raven Dr, New Lisbon, WI 53950","Utility":"Oakdale Electric Cooperative","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.25","System Size (MW-DC)":"0.33","Year of Interconnection":"2017"},{"UtilityID":"4716","Project Name":"WI - DAIRYLAND 1","City":"Westby","State":"WI","Address":"110 Saugstad Rd, Westby, WI 54667","Utility":"Dairyland Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.03","System Size (MW-DC)":"0.04","Year of Interconnection":"2017"},{"UtilityID":"4716","Project Name":"WI - DAIRYLAND 2","City":"Westby","State":"WI","Address":"E2263 WI\u201182, De Soto, WI 54624","Utility":"Dairyland Power Coop","Utility Type":"Cooperative","Basic Structure":"Rural electric cooperative","System Size (MW-AC)":"0.04","System Size (MW-DC)":"0.05","Year of Interconnection":"2017"},{"UtilityID":"16534","Project Name":"Rancho Seco II","City":"Herald","State":"CA","Address":"14960 Twin Cities Road, Herald, CA 95638","Utility":"Sacramento Municipal Utility District (SMUD)","Utility Type":"Municipal","Basic Structure":"Consumer-owned utility","System Size (MW-AC)":"160.00","System Size (MW-DC)":"208.00","Year of Interconnection":"2021"},{"UtilityID":"16534","Project Name":"Wildflower","City":"Rio Linda","State":"CA","Address":"West 6th St, Rio Linda, CA 95673","Utility":"Sacramento Municipal Utility District (SMUD)","Utility Type":"Municipal","Basic Structure":"Consumer-owned utility","System Size (MW-AC)":"11.60","System Size (MW-DC)":"15.08","Year of Interconnection":"2021"},{"UtilityID":"20847","Project Name":"Janesville Community Solar garden","City":"Janesville","State":"WI","Address":"3400 N County Rd F, Janesville, WI 53545","Utility":"Alliant Energy","Utility Type":"Investor Owned","Basic Structure":"Publicly owned utility","System Size (MW-AC)":"2.25","System Size (MW-DC)":"2.93","Year of Interconnection":"2025"}];
+
+// ── Compute global max MW for bar scaling
+const MAX_MW = Math.max(...RAW.map(r => parseFloat(r['System Size (MW-AC)']) || 0));
+
+// ── State
+let data = [...RAW];
+let sortCol = null;
+let sortDir = 1; // 1=asc, -1=desc
+let viewMode = 'table';
+
+// ── Populate filter dropdowns
+function initFilters() {
+  const states = [...new Set(RAW.map(r => r['State']))].filter(Boolean).sort();
+  const stateEl = document.getElementById('filter-state');
+  states.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; stateEl.appendChild(o); });
+
+  const structs = [...new Set(RAW.map(r => r['Basic Structure']))].filter(Boolean).sort();
+  const structEl = document.getElementById('filter-structure');
+  structs.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; structEl.appendChild(o); });
+
+  const types = [...new Set(RAW.map(r => r['Utility Type']))].filter(Boolean).sort();
+  const typeEl = document.getElementById('filter-utility-type');
+  types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; typeEl.appendChild(o); });
+}
+
+// ── Badge helper
+function badgeClass(structure) {
+  const s = (structure || '').toLowerCase();
+  if (s.includes('cooperative') && s.includes('rural')) return 'badge-rural';
+  if (s.includes('cooperative')) return 'badge-cooperative';
+  if (s.includes('publicly')) return 'badge-publicly';
+  if (s.includes('consumer')) return 'badge-consumer';
+  return 'badge-cooperative';
+}
+
+function badgeLabel(structure) {
+  const s = (structure || '').toLowerCase();
+  if (s.includes('rural')) return 'Rural E.C.';
+  if (s.includes('cooperative')) return 'Cooperative';
+  if (s.includes('publicly')) return 'Public Util.';
+  if (s.includes('consumer')) return 'Consumer';
+  return structure;
+}
+
+// ── Render
+function setView(mode) {
+  viewMode = mode;
+  const tableWrap = document.getElementById('table-wrap');
+  const cardGrid  = document.getElementById('card-grid');
+  const btnTable  = document.getElementById('btn-table');
+  const btnCard   = document.getElementById('btn-card');
+  if (mode === 'card') {
+    tableWrap.style.display = 'none';
+    cardGrid.classList.add('active');
+    btnTable.classList.remove('active');
+    btnCard.classList.add('active');
+  } else {
+    tableWrap.style.display = '';
+    cardGrid.classList.remove('active');
+    btnTable.classList.add('active');
+    btnCard.classList.remove('active');
+  }
+  render();
+}
+
+function render() {
+  if (viewMode === 'card') { renderCards(); return; }
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tbody');
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">☀</div><p>No projects match the current filters.</p></div></td></tr>`;
+    updateStats(data);
+    return;
+  }
+  tbody.innerHTML = data.map(r => {
+    const mw = parseFloat(r['System Size (MW-AC)']) || 0;
+    const pct = Math.max(2, Math.round((mw / MAX_MW) * 100));
+    const yr = r['Year of Interconnection'] || '—';
+    return `
+      <tr>
+        <td class="wrap">${r['Project Name'] || '—'}</td>
+        <td class="muted">${r['City'] || '—'}</td>
+        <td class="mono" style="font-weight:500;color:var(--accent)">${r['State'] || '—'}</td>
+        <td class="wrap muted" style="max-width:200px">${r['Utility'] || '—'}</td>
+        <td><span style="font-size:11px;color:var(--text-muted)">${r['Utility Type'] || '—'}</span></td>
+        <td><span class="badge ${badgeClass(r['Basic Structure'])}">${badgeLabel(r['Basic Structure'])}</span></td>
+        <td>
+          <div class="mw-cell">
+            <div class="mw-bar-bg"><div class="mw-bar-fill" style="width:${pct}%"></div></div>
+            <span class="mw-val">${mw.toFixed(2)}</span>
+          </div>
+        </td>
+        <td class="dimmed">${parseFloat(r['System Size (MW-DC)']).toFixed(2) || '—'}</td>
+        <td class="mono" style="color:var(--text-muted)">${yr}</td>
+        <td class="dimmed">${r['UtilityID'] || '—'}</td>
+      </tr>`;
+  }).join('');
+  updateStats(data);
+}
+
+function renderCards() {
+  const grid = document.getElementById('card-grid');
+  if (data.length === 0) {
+    grid.innerHTML = `<div class="card-empty"><div class="empty-icon">☀</div><p>No projects match the current filters.</p></div>`;
+    updateStats(data);
+    return;
+  }
+  grid.innerHTML = data.map(r => {
+    const mw  = parseFloat(r['System Size (MW-AC)']) || 0;
+    const pct = Math.max(2, Math.round((mw / MAX_MW) * 100));
+    const yr  = r['Year of Interconnection'] || '—';
+    const loc = [r['City'], r['State']].filter(Boolean).join(', ') || '—';
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-name">${r['Project Name'] || '—'}</div>
+          <div class="card-location">${loc}</div>
+        </div>
+        <span class="badge ${badgeClass(r['Basic Structure'])}">${badgeLabel(r['Basic Structure'])}</span>
+      </div>
+      <hr class="card-divider"/>
+      <div class="card-row">
+        <span class="card-lbl">Utility</span>
+        <span class="card-val" style="text-align:right;max-width:160px;white-space:normal">${r['Utility'] || '—'}</span>
+      </div>
+      <div class="card-row">
+        <span class="card-lbl">Type</span>
+        <span class="card-val">${r['Utility Type'] || '—'}</span>
+      </div>
+      <div class="card-row" style="gap:8px">
+        <span class="card-lbl" style="white-space:nowrap">MW-AC</span>
+        <div class="card-mw" style="flex:1">
+          <div class="card-mw-bar-bg"><div class="card-mw-bar-fill" style="width:${pct}%"></div></div>
+          <span class="card-mw-val">${mw.toFixed(2)}</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span class="card-year">Year: ${yr}</span>
+        <span class="card-val" style="color:var(--accent);font-weight:600">${r['State'] || ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+  updateStats(data);
+}
+
+function updateStats(d) {
+  document.getElementById('result-count').innerHTML = `<span>${d.length}</span> of ${RAW.length} shown`;
+  document.getElementById('stat-total').textContent = d.length;
+  const states = new Set(d.map(r => r['State']).filter(Boolean));
+  document.getElementById('stat-states').textContent = states.size;
+  const totalMW = d.reduce((acc, r) => acc + (parseFloat(r['System Size (MW-AC)']) || 0), 0);
+  document.getElementById('stat-mw').textContent = totalMW.toFixed(1);
+}
+
+// ── Filter
+function applyFilters() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const state = document.getElementById('filter-state').value;
+  const structure = document.getElementById('filter-structure').value;
+  const utilType = document.getElementById('filter-utility-type').value;
+  const yearMin = parseInt(document.getElementById('filter-year-min').value) || 0;
+  const yearMax = parseInt(document.getElementById('filter-year-max').value) || 9999;
+  const mwMin = parseFloat(document.getElementById('filter-mw-min').value) || 0;
+
+  data = RAW.filter(r => {
+    if (q) {
+      const haystack = [r['Project Name'], r['City'], r['Utility'], r['Address']].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (state && r['State'] !== state) return false;
+    if (structure && r['Basic Structure'] !== structure) return false;
+    if (utilType && r['Utility Type'] !== utilType) return false;
+    const yr = parseInt(r['Year of Interconnection']) || 0;
+    if (yr && (yr < yearMin || yr > yearMax)) return false;
+    const mw = parseFloat(r['System Size (MW-AC)']) || 0;
+    if (mw < mwMin) return false;
+    return true;
+  });
+
+  if (sortCol) applySortOnData();
+  render();
+}
+
+// ── Sort
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sorted');
+    th.querySelector('.sort-arrow').textContent = '↕';
+  });
+  const th = document.querySelector(`th[data-col="${col}"]`);
+  if (th) {
+    th.classList.add('sorted');
+    th.querySelector('.sort-arrow').textContent = sortDir === 1 ? '↑' : '↓';
+  }
+  applySortOnData();
+  render();
+}
+
+function applySortOnData() {
+  const numCols = ['System Size (MW-AC)', 'System Size (MW-DC)', 'Year of Interconnection', 'UtilityID'];
+  data.sort((a, b) => {
+    let av = a[sortCol] || '', bv = b[sortCol] || '';
+    if (numCols.includes(sortCol)) {
+      av = parseFloat(av) || 0; bv = parseFloat(bv) || 0;
+      return (av - bv) * sortDir;
+    }
+    return av.localeCompare(bv) * sortDir;
+  });
+}
+
+function resetFilters() {
+  document.getElementById('search').value = '';
+  document.getElementById('filter-state').value = '';
+  document.getElementById('filter-structure').value = '';
+  document.getElementById('filter-utility-type').value = '';
+  document.getElementById('filter-year-min').value = '';
+  document.getElementById('filter-year-max').value = '';
+  document.getElementById('filter-mw-min').value = '';
+  sortCol = null; sortDir = 1;
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sorted');
+    th.querySelector('.sort-arrow').textContent = '↕';
+  });
+  data = [...RAW];
+  render();
+}
+
+// ── Event listeners
+['search','filter-state','filter-structure','filter-utility-type','filter-year-min','filter-year-max','filter-mw-min'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyFilters);
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+
+// ── Init
+initFilters();
+render();
+buildOverview();
+
+// ── Page switching
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.page-tab').forEach(t => {
+    if (t.textContent.toLowerCase().startsWith(name)) t.classList.add('active');
+  });
+}
+
+// ── Overview builder
+let structChart = null;
+function buildOverview() {
+  const totalMW = RAW.reduce((s, r) => s + (parseFloat(r['System Size (MW-AC)']) || 0), 0);
+  const states  = new Set(RAW.map(r => r['State']).filter(Boolean));
+  document.getElementById('ov-count').textContent  = RAW.length;
+  document.getElementById('ov-states').textContent = states.size;
+  document.getElementById('ov-mw').textContent     = totalMW.toFixed(1);
+  document.getElementById('ov-avg').textContent    = (totalMW / RAW.length).toFixed(2);
+
+  // ── Bar chart: projects by Basic Structure
+  const structCounts = {};
+  RAW.forEach(r => {
+    const k = r['Basic Structure'] || 'Unknown';
+    structCounts[k] = (structCounts[k] || 0) + 1;
+  });
+  const structLabels = Object.keys(structCounts).sort((a, b) => structCounts[b] - structCounts[a]);
+  const structVals   = structLabels.map(k => structCounts[k]);
+
+  if (structChart) structChart.destroy();
+  const ctx = document.getElementById('chart-structure').getContext('2d');
+  structChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: structLabels,
+      datasets: [{
+        data: structVals,
+        backgroundColor: 'rgba(46,139,87,0.75)',
+        borderColor: '#2e8b57',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#8ab08a', font: { family: "'IBM Plex Mono', monospace", size: 11 }, maxRotation: 30 },
+          grid: { color: '#d9ecd9' }
+        },
+        y: {
+          ticks: { color: '#8ab08a', font: { family: "'IBM Plex Mono', monospace", size: 11 } },
+          grid: { color: '#d9ecd9' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  // ── Pivot table: Basic Structure × Utility Type
+  const structures = [...new Set(RAW.map(r => r['Basic Structure']).filter(Boolean))].sort();
+  const utilTypes  = [...new Set(RAW.map(r => r['Utility Type']).filter(Boolean))].sort();
+
+  const counts = {};
+  RAW.forEach(r => {
+    const s = r['Basic Structure'] || '', u = r['Utility Type'] || '';
+    if (!s || !u) return;
+    counts[s] = counts[s] || {};
+    counts[s][u] = (counts[s][u] || 0) + 1;
+  });
+
+  const colTotals = {};
+  utilTypes.forEach(u => { colTotals[u] = structures.reduce((s, st) => s + ((counts[st] || {})[u] || 0), 0); });
+  const maxCell = Math.max(...structures.map(st => Math.max(...utilTypes.map(u => (counts[st] || {})[u] || 0))));
+
+  const pivot = document.getElementById('pivot-table');
+  pivot.innerHTML = `
+    <thead>
+      <tr>
+        <th>Structure \\ Utility Type</th>
+        ${utilTypes.map(u => `<th>${u}</th>`).join('')}
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${structures.map(st => {
+        const rowTotal = utilTypes.reduce((s, u) => s + ((counts[st] || {})[u] || 0), 0);
+        return `<tr>
+          <td><span class="badge ${badgeClass(st)}">${badgeLabel(st)}</span></td>
+          ${utilTypes.map(u => {
+            const v = (counts[st] || {})[u] || 0;
+            const cls = v === 0 ? 'zero' : (v === maxCell ? 'hot' : '');
+            return `<td class="${cls}">${v || '—'}</td>`;
+          }).join('')}
+          <td style="color:var(--accent2);font-weight:600">${rowTotal}</td>
+        </tr>`;
+      }).join('')}
+      <tr>
+        <td>Total</td>
+        ${utilTypes.map(u => `<td>${colTotals[u]}</td>`).join('')}
+        <td>${RAW.length}</td>
+      </tr>
+    </tbody>`;
+}
+</script>
+</body>
+</html>
